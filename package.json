@@ -1,0 +1,23 @@
+{
+  "name": "pos-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Web-based bookshop POS — Next.js + NestJS + Prisma + SQLite monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:web": "npm run dev -w @pos/web",
+    "dev:api": "npm run start:dev -w @pos/api",
+    "build": "npm run build --workspaces --if-present",
+    "db:generate": "npm run generate -w @pos/database",
+    "db:migrate": "npm run migrate -w @pos/database",
+    "db:studio": "npm run studio -w @pos/database",
+    "db:seed": "npm run seed -w @pos/database"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

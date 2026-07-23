@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  DRAFT
+  HELD
+  PENDING
+  PAID
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  CREDIT
+  ACCOUNT_TRANSFER
+  CHEQUE
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  CASHIER
+}
+
+enum InventoryReason {
+  SALE
+  REFUND
+  ADJUSTMENT
+  RECEIVE
+  DAMAGE
+  RETURN
+  INITIAL
+}
+
+model User {
+  id           String                @id @default(cuid())
+  email        String                @unique
+  name         String
+  passwordHash String
+  role         UserRole              @default(CASHIER)
+  isActive     Boolean               @default(true)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  orders       Order[]
+  adjustments  InventoryAdjustment[]
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Product {
+  id          String                @id @default(cuid())
+  sku         String                @unique
+  barcode     String?               @unique
+  name        String
+  description String?
+  price       Decimal
+  cost        Decimal?
+  stock       Int                   @default(0)
+  lowStockAt  Int                   @default(5)
+  isActive    Boolean               @default(true)
+  categoryId  String?
+  category    Category?             @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  orderItems  OrderItem[]
+  adjustments InventoryAdjustment[]
+
+  @@index([name])
+  @@index([categoryId])
+  @@index([barcode])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?  @unique
+  phone     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+
+  @@index([name])
+  @@index([phone])
+}
+
+model Order {
+  id                 String        @id @default(cuid())
+  orderNumber        String        @unique
+  status             OrderStatus   @default(DRAFT)
+  subtotal           Decimal
+  tax                Decimal       @default(0)
+  discount           Decimal       @default(0)
+  total              Decimal
+  notes              String?
+  cashierId          String?
+  cashier            User?         @relation(fields: [cashierId], references: [id])
+  customerId         String?
+  customer           Customer?     @relation(fields: [customerId], references: [id])
+  // Credit (accounts receivable) tracking
+  isCredit           Boolean       @default(false)
+  creditSettledAt    DateTime?
+  creditSettleMethod PaymentMethod?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  items              OrderItem[]
+  payments           Payment[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([cashierId])
+  @@index([isCredit])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+  name      String   @default("")
+  quantity  Int
+  unitPrice Decimal
+  lineTotal Decimal
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  orderId   String
+  order     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method    PaymentMethod
+  amount    Decimal
+  reference String?
+  paidAt    DateTime      @default(now())
+
+  @@index([orderId])
+}
+
+model InventoryAdjustment {
+  id        String          @id @default(cuid())
+  productId String
+  product   Product         @relation(fields: [productId], references: [id])
+  delta     Int
+  reason    InventoryReason
+  note      String?
+  userId    String?
+  user      User?           @relation(fields: [userId], references: [id])
+  createdAt DateTime        @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+}
+
+model StoreSetting {
+  id               String   @id @default("default")
+  storeName        String   @default("POS Store")
+  address          String?
+  phone            String?
+  taxRate          Decimal  @default(0)
+  currency         String   @default("LKR")
+  receiptFooter    String?  @default("Thank you for your purchase!")
+  lowStockThreshold Int     @default(5)
+  updatedAt        DateTime @updatedAt
+}
+
+// Photocopy / printout / binding etc. — services billed without a barcode.
+model ServiceItem {
+  id        String   @id @default(cuid())
+  name      String
+  unitPrice Decimal
+  unitLabel String   @default("page")
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+}
